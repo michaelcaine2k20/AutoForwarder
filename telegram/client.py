@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from typing import Dict, Optional
@@ -18,6 +19,9 @@ class TelegramMonitor:
     def __init__(self):
         self.client: Optional[TelegramClient] = None
         self.monitored_channels: Dict[int, str] = {}
+        # Add a way to store the verification code
+        self._verification_code: Optional[str] = None
+        self._verification_event = asyncio.Event()
 
     async def start_client(self):
         """Initialize and start the Telegram client"""
@@ -29,7 +33,10 @@ class TelegramMonitor:
             )
             # await self.client.start(bot_token=settings.telegram.BOT_TOKEN)
 
-            await self.client.start(phone=settings.telegram.PHONE)
+            await self.client.start(
+                phone=settings.telegram.PHONE,
+                code_callback=self._code_callback,
+            )
 
             logger.info(f"Telegram client started successfully. adding channels {settings.telegram.CHANNELS}")
             channels = settings.telegram.CHANNELS.split(',')
@@ -146,3 +153,18 @@ class TelegramMonitor:
             await self.client.forward_messages(settings.telegram.TARGET_CHANNEL_ID, message)
         except Exception as e:
             logger.error(f"Error forwarding message: {str(e)}")
+
+    async def _code_callback(self):
+        """Wait for verification code to be provided via API"""
+        logger.info("Waiting for verification code to be provided via API...")
+        await self._verification_event.wait()  # Wait for code to be set
+        code = self._verification_code
+        self._verification_code = None  # Clear the code
+        self._verification_event.clear()  # Reset the event
+        return code
+
+    async def provide_verification_code(self, code: str):
+        """Method to provide verification code through API"""
+        self._verification_code = code
+        self._verification_event.set()  # Signal that code is available
+        logger.info("Verification code provided")

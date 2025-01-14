@@ -1,4 +1,5 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from telegram.instance import monitor
 
@@ -9,6 +10,20 @@ router = APIRouter()
 async def start():
     """starts the telegram client"""
     return await monitor.start_client()
+
+
+class VerificationCode(BaseModel):
+    code: str
+
+
+@router.post("/verify")
+async def provide_verification_code(verification: VerificationCode):
+    """Endpoint to provide verification code"""
+    try:
+        await monitor.provide_verification_code(verification.code)
+        return {"status": "success", "message": "Verification code provided"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/channels/{channel_username}")
