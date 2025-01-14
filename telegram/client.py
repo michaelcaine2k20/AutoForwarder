@@ -52,13 +52,13 @@ class TelegramMonitor:
 
             @self.client.on(events.MessageEdited())
             async def handle_message_edited(event):
-                # logger.info(f"Received edited message: {event.text[:50]}...")
+                logger.info(f"Received edited message: {event.text[:50]}...")
                 await self._process_event(event, 'edit')
                 # await self.forward_message(event.message)
 
             @self.client.on(events.MessageDeleted())
             async def handle_message_deleted(event):
-                # logger.info(f"Received deleted message: {event.chat_id}")
+                logger.info(f"Received deleted message: {event.chat_id}")
                 await self._process_event(event, 'delete')
                 # await self.forward_message(event.message)
 
@@ -66,34 +66,35 @@ class TelegramMonitor:
         try:
             chat = await event.get_chat()
             real_id, peer_type = utils.resolve_id(event.chat_id)
+            logger.info(
+                f"Received event({event_type}) from channel({chat.title}) => real_id: {real_id}, peer_type: {peer_type}")
             if real_id not in self.monitored_channels:
-                logger.info(
-                    f"Received event({event_type}) from unmonitored channel({chat.title}) => real_id: {real_id}, peer_type: {peer_type}")
+                logger.info(f"unmonitored channel({chat.title})")
                 return
 
-            chat = await event.get_chat()
-            logger.info(f"chat: {chat}")
-            sender = await event.get_sender()
-            logger.info(f"sender: {sender}")
-            message = event.message
-            logger.info(f"message: {message}")
+            # chat = await event.get_chat()
+            # logger.info(f"chat: {chat}")
+            # sender = await event.get_sender()
+            # logger.info(f"sender: {sender}")
+            # message = event.message
+            # logger.info(f"message: {message}")
+            #
+            # message_data = {
+            #     'event_type': event_type,
+            #     'source_channel_id': event.chat_id,
+            #     'message_id': event.id,
+            #     'text': event.text,
+            #     'timestamp': event.date,
+            #     'sender_id': sender.id if sender else None,
+            #     'sender_name': sender.username if sender else None
+            # }
+            #
+            # logger.info(f"new Event:{'-' * 200}")
+            # logger.info(json.dumps(message_data, default=str))
+            # logger.info(f"{'-' * 200}")
 
-            message_data = {
-                'event_type': event_type,
-                'source_channel_id': event.chat_id,
-                'message_id': event.id,
-                'text': event.text,
-                'timestamp': event.date,
-                'sender_id': sender.id if sender else None,
-                'sender_name': sender.username if sender else None
-            }
-
-            logger.info(f"new Event:{'-' * 200}")
-            logger.info(json.dumps(message_data, default=str))
-            logger.info(f"{'-' * 200}")
-
-            await self.forward_message(message)
-            await self.send_message(message)
+            await self.forward_message(event.message)
+            await self.send_message(event.message)
         except Exception as e:
             logger.error(f"Error processing event: {str(e)}")
 
@@ -144,13 +145,13 @@ class TelegramMonitor:
 
     async def send_message(self, message):
         try:
-            await self.client.send_message(settings.telegram.TARGET_CHANNEL_ID, message)
+            await self.client.send_message(PeerChannel(settings.telegram.TARGET_CHANNEL_ID), message)
         except Exception as e:
             logger.error(f"Error sending message: {str(e)}")
 
     async def forward_message(self, message):
         try:
-            await self.client.forward_messages(settings.telegram.TARGET_CHANNEL_ID, message)
+            await self.client.forward_messages(PeerChannel(settings.telegram.TARGET_CHANNEL_ID), message)
         except Exception as e:
             logger.error(f"Error forwarding message: {str(e)}")
 
