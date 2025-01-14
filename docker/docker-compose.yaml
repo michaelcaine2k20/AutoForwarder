@@ -5,6 +5,7 @@ services:
       dockerfile: docker/Dockerfile
     ports:
       - "8000:8000"
-
+    volumes:
+      - ../sessions:/app/sessions
     env_file:
       - ../.env
