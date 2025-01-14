@@ -1,0 +1,17 @@
+.mypy_cache
+.coverage
+htmlcov
+__pycache__
+app.egg-info
+.vscode
+docker-stack.yml
+.idea
+.env
+.env.dev
+.env.prod
+tmp/
+app/tmp/
+chats
+.DS_Store
+*.session
+
