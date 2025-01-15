@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from telegram.instance import monitor
+from app.telegram.instance import monitor
 
 router = APIRouter()
 

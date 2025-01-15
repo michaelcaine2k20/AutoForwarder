@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 from typing import Dict, Optional
 
@@ -7,7 +6,7 @@ from fastapi import HTTPException
 from telethon import TelegramClient, events, utils
 from telethon.tl.types import Channel, PeerChannel
 
-from settings import settings
+from app.settings import settings
 
 # Set up logging to help with debugging
 logging.basicConfig(level=logging.INFO)

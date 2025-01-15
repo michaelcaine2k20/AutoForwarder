@@ -2,10 +2,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from api.health_check import router as health_check_router
+from app.api.health_check import router as health_check_router
 
-from api.telegram import router as telegram_router
-from telegram.instance import monitor
+from app.api.telegram import router as telegram_router
 
 
 @asynccontextmanager
