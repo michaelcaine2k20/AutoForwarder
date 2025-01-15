@@ -9,6 +9,7 @@ class TelegramSettings(BaseModel):
     BOT_TOKEN: str
     CHANNELS: str
     TARGET_CHANNEL_ID: int
+    FORWARD: bool = True
 
 
 class Settings(BaseSettings):

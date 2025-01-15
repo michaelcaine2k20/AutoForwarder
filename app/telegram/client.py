@@ -97,8 +97,10 @@ class TelegramMonitor(TelegramMonitorProtocol):
             # logger.info(json.dumps(message_data, default=str))
             # logger.info(f"{'-' * 200}")
 
-            await self.forward_message(event.message)
-            await self.send_message(event.message)
+            if settings.telegram.FORWARD:
+                await self.forward_message(event.message)
+            else:
+                await self.send_message(event.message)
         except Exception as e:
             logger.error(f"Error processing event: {str(e)}")
 
