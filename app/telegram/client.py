@@ -1,34 +1,39 @@
 import asyncio
 import logging
+from pathlib import Path
 from typing import Dict, Optional
 
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 from telethon import TelegramClient, events, utils
 from telethon.tl.types import Channel, PeerChannel
 
 from app.settings import settings
+from app.telegram.base import TelegramMonitorProtocol
 
 # Set up logging to help with debugging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+SESSIONS_DIR = Path(__file__).parent.parent / "sessions"
+
 
 # Class to manage our Telegram client and channel monitoring
-class TelegramMonitor:
-    def __init__(self):
+class TelegramMonitor(TelegramMonitorProtocol):
+    def __init__(self) -> None:
         self.client: Optional[TelegramClient] = None
         self.monitored_channels: Dict[int, str] = {}
         # Add a way to store the verification code
         self._verification_code: Optional[str] = None
         self._verification_event = asyncio.Event()
 
-    async def start_client(self):
+    async def start(self) -> None:
         """Initialize and start the Telegram client"""
         if self.client is None:
+            logger.info("Starting Telegram client...")
             self.client = TelegramClient(
-                f'sessions/session',
+                f"{SESSIONS_DIR}/session",
                 settings.telegram.API_ID,
-                settings.telegram.API_HASH
+                settings.telegram.API_HASH,
             )
             # await self.client.start(bot_token=settings.telegram.BOT_TOKEN)
 
@@ -37,8 +42,10 @@ class TelegramMonitor:
                 code_callback=self._code_callback,
             )
 
-            logger.info(f"Telegram client started successfully. adding channels {settings.telegram.CHANNELS}")
-            channels = settings.telegram.CHANNELS.split(',')
+            logger.info(
+                f"Telegram client started successfully. adding channels {settings.telegram.CHANNELS}"
+            )
+            channels = settings.telegram.CHANNELS.split(",")
             for channel_username in channels:
                 await self.add_channel(channel_username)
 
@@ -46,27 +53,25 @@ class TelegramMonitor:
             @self.client.on(events.NewMessage())
             async def handle_new_message(event):
                 logger.info(f"Received new message: {event.text[:50]}...")
-                await self._process_event(event, 'new')
-                # await self.forward_message(event.message)
+                await self._process_event(event, "new")
 
             @self.client.on(events.MessageEdited())
             async def handle_message_edited(event):
                 logger.info(f"Received edited message: {event.text[:50]}...")
-                await self._process_event(event, 'edit')
-                # await self.forward_message(event.message)
+                await self._process_event(event, "edit")
 
             @self.client.on(events.MessageDeleted())
             async def handle_message_deleted(event):
                 logger.info(f"Received deleted message: {event.chat_id}")
-                await self._process_event(event, 'delete')
-                # await self.forward_message(event.message)
+                await self._process_event(event, "delete")
 
     async def _process_event(self, event, event_type):
         try:
             chat = await event.get_chat()
             real_id, peer_type = utils.resolve_id(event.chat_id)
             logger.info(
-                f"Received event({event_type}) from channel({chat.title}) => real_id: {real_id}, peer_type: {peer_type}")
+                f"Received event({event_type}) from channel({chat.title}) => real_id: {real_id}, peer_type: {peer_type}"
+            )
             if real_id not in self.monitored_channels:
                 logger.info(f"unmonitored channel({chat.title})")
                 return
@@ -109,10 +114,15 @@ class TelegramMonitor:
                 logger.info(f"Added channel: {channel_username}")
                 return {"status": "success", "channel_id": channel.id}
             else:
-                raise HTTPException(status_code=400, detail="Not a valid channel")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Not a valid channel"
+                )
         except Exception as e:
             logger.error(f"Error adding channel {channel_username}: {str(e)}")
-            raise HTTPException(status_code=400, detail=str(e))
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=str(e),
+            )
 
     async def remove_channel(self, channel_username: str):
         """Remove a channel from monitoring"""
@@ -127,7 +137,9 @@ class TelegramMonitor:
             logger.info(f"Removed channel: {channel_username}")
             return {"status": "success", "channel": channel_username}
         else:
-            raise HTTPException(status_code=404, detail="Channel not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Channel not found"
+            )
 
     def get_monitored_channels(self):
         """Get list of currently monitored channels"""
@@ -136,21 +148,33 @@ class TelegramMonitor:
     async def get_all_channels(self):
         """Fetch all channels the bot is a member of"""
         channels = await self.client.get_dialogs()
-        return [{
-            'id': channel.id,
-            'name': channel.name,
-            'username': channel.entity.username if isinstance(channel.entity, Channel) else None
-        } for channel in channels if isinstance(channel.entity, Channel)]
+        return [
+            {
+                "id": channel.id,
+                "name": channel.name,
+                "username": (
+                    channel.entity.username
+                    if isinstance(channel.entity, Channel)
+                    else None
+                ),
+            }
+            for channel in channels
+            if isinstance(channel.entity, Channel)
+        ]
 
     async def send_message(self, message):
         try:
-            await self.client.send_message(PeerChannel(settings.telegram.TARGET_CHANNEL_ID), message)
+            await self.client.send_message(
+                PeerChannel(settings.telegram.TARGET_CHANNEL_ID), message
+            )
         except Exception as e:
             logger.error(f"Error sending message: {str(e)}")
 
     async def forward_message(self, message):
         try:
-            await self.client.forward_messages(PeerChannel(settings.telegram.TARGET_CHANNEL_ID), message)
+            await self.client.forward_messages(
+                PeerChannel(settings.telegram.TARGET_CHANNEL_ID), message
+            )
         except Exception as e:
             logger.error(f"Error forwarding message: {str(e)}")
 
@@ -168,3 +192,36 @@ class TelegramMonitor:
         self._verification_code = code
         self._verification_event.set()  # Signal that code is available
         logger.info("Verification code provided")
+
+    async def stop(self) -> None:
+        if self.client is None:
+            raise HTTPException(
+                status_code=status.HTTP_412_PRECONDITION_FAILED,
+                detail="Telegram client is not running",
+            )
+        try:
+            await self.client.disconnect()
+            self.client = None
+            logger.info("Telegram client stopped successfully")
+        except Exception as e:
+            logger.error(f"Error stopping Telegram client: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=str(e),
+            )
+
+    async def is_running(self) -> bool:
+        if self.client is None:
+            raise HTTPException(
+                status_code=status.HTTP_412_PRECONDITION_FAILED,
+                detail="Telegram client is not running",
+            )
+
+        try:
+            return await self.client.is_user_authorized()
+        except Exception as e:
+            logger.error(f"Error checking if Telegram client is running: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=str(e),
+            )

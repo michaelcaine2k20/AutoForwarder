@@ -13,10 +13,10 @@ class TelegramSettings(BaseModel):
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file='../.env',
-        env_file_encoding='utf-8',
+        env_file=".env",
+        env_file_encoding="utf-8",
         nested_model_default_partial_update=True,
-        env_nested_delimiter='__',
+        env_nested_delimiter="__",
         extra="ignore",
     )
 
