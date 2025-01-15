@@ -35,12 +35,14 @@ class TelegramMonitor(TelegramMonitorProtocol):
                 settings.telegram.API_ID,
                 settings.telegram.API_HASH,
             )
-            # await self.client.start(bot_token=settings.telegram.BOT_TOKEN)
 
-            await self.client.start(
-                phone=settings.telegram.PHONE,
-                code_callback=self._code_callback,
-            )
+            start_options = {"code_callback": self._code_callback}
+            if settings.telegram.BOT_TOKEN:
+                start_options["bot_token"] = settings.telegram.BOT_TOKEN
+            else:
+                start_options["phone"] = settings.telegram.PHONE
+
+            await self.client.start(**start_options)
 
             logger.info(
                 f"Telegram client started successfully. adding channels {settings.telegram.CHANNELS}"

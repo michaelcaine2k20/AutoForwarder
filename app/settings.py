@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -6,7 +8,7 @@ class TelegramSettings(BaseModel):
     API_ID: int
     API_HASH: str
     PHONE: str
-    BOT_TOKEN: str
+    BOT_TOKEN: Optional[str] = None
     CHANNELS: str
     TARGET_CHANNEL_ID: int
     FORWARD: bool = True
